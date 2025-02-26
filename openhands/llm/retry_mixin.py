@@ -162,6 +162,24 @@ class RetryMixin:
                 logger.error('Unexpected error during rate limit check: %s', str(e))
                 raise
 
+    def retry_if_exception_type(self, exceptions: tuple) -> callable:
+        """Create a custom retry condition for specific exception types.
+
+        This method creates a custom retry condition that retries only for specific
+        exception types. It is used in the retry_decorator method to handle rate limits
+        and other transient errors separately.
+
+        Args:
+            exceptions: Tuple of exception types to retry on
+
+        Returns:
+            callable: A retry condition that retries only for the specified exceptions
+        """
+        def retry_if_exception(exception):
+            return isinstance(exception, exceptions)
+        return retry_if_exception
+
+
     def retry_decorator(
         self,
         *,
@@ -257,7 +275,7 @@ class RetryMixin:
             stop=stop_after_attempt(num_retries) | stop_if_should_exit(),
             reraise=True,
             retry=(
-                retry_if_exception_type(retry_exceptions)
+                self.retry_if_exception_type(retry_exceptions)
             ),  # retry only for these types
             wait=wait_exponential(
                 multiplier=retry_multiplier,
