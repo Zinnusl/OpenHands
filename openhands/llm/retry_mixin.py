@@ -161,50 +161,6 @@ class RetryMixin:
             except Exception as e:
                 logger.error('Unexpected error during rate limit check: %s', str(e))
                 raise
-                        if hasattr(self.config, attr):
-                            value = getattr(self.config, attr)
-                            if value is not None:  # Only add non-None values
-                                test_kwargs[attr] = value
-                                logger.debug('Using config %s: %s', attr, value)
-                    
-                    # Handle api_key separately due to potential secret value
-                    if hasattr(self.config, 'api_key') and self.config.api_key:
-                        try:
-                            test_kwargs['api_key'] = self.config.api_key.get_secret_value()
-                            logger.debug('Using API key from config')
-                        except AttributeError:
-                            # If api_key is not a secret
-                            test_kwargs['api_key'] = self.config.api_key
-                            logger.debug('Using non-secret API key from config')
-                else:
-                    logger.warning('No config found for rate limit test request')
-                    # Fallback to minimal test if config not available
-                    test_kwargs = {}
-                
-                logger.debug('Attempting test request to check rate limit status with kwargs: %s', 
-                           {k: v for k, v in test_kwargs.items() if k != 'api_key'})
-                
-                try:
-                    litellm_completion(
-                        messages=test_msg,
-                        max_tokens=1,
-                        **test_kwargs
-                    )
-                    logger.info('Rate limit has been lifted. Proceeding with the request.')
-                    return
-                except (RateLimitError, InternalServerError) as e:
-                    if isinstance(e, InternalServerError) and '429' not in str(e):
-                        logger.error('Unexpected server error during rate limit check: %s', str(e))
-                        raise
-                    logger.info('Still rate limited (%s), waiting %s seconds before next check...', 
-                              str(e), retry_min_wait)
-                    time.sleep(retry_min_wait)
-                except (ValueError, KeyError, AttributeError) as e:
-                    logger.warning('Configuration error during rate limit check: %s', str(e))
-                    time.sleep(retry_min_wait)
-                except Exception as e:
-                    logger.error('Unexpected error during rate limit check: %s', str(e))
-                    raise
 
     def retry_decorator(
         self,
