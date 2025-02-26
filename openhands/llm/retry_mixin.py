@@ -1,4 +1,4 @@
-import asyncio
+"""Module providing retry functionality for LLM API calls with rate limit handling."""
 import time
 from tenacity import (
     retry,
@@ -33,25 +33,25 @@ class RetryMixin:
             reset_time = getattr(exception, 'reset_time', None)
             is_rate_limit = True
         elif isinstance(exception, InternalServerError) and '429' in str(exception):
-            logger.info("Detected rate limit in InternalServerError")
+            logger.info('Detected rate limit in InternalServerError')
             is_rate_limit = True
 
         if not is_rate_limit:
-            logger.warning(f"Unexpected error type in handle_rate_limit: {type(exception)}")
+            logger.warning('Unexpected error type in handle_rate_limit: %s', type(exception))
             return
 
         if reset_time:
             wait_time = max(0, reset_time - time.time())
-            logger.info(f"Rate limit hit. Waiting for {wait_time:.2f} seconds until reset...")
+            logger.info('Rate limit hit. Waiting for %.2f seconds until reset...', wait_time)
             time.sleep(wait_time)
             return
 
         # If no reset time is available, use polling
-        logger.info(f"Rate limit hit. Polling every {retry_min_wait} seconds...")
+        logger.info('Rate limit hit. Polling every %s seconds...', retry_min_wait)
         while True:
             try:
                 # Try a minimal request to check if rate limit is over
-                test_msg = [{"role": "user", "content": "test"}]
+                test_msg = [{'role': 'user', 'content': 'test'}]
                 test_kwargs = {
                     k: v for k, v in self._completion.keywords.items()
                     if k not in ['messages', 'max_tokens']
@@ -61,40 +61,34 @@ class RetryMixin:
                     max_tokens=1,
                     **test_kwargs
                 )
-                logger.info("Rate limit has been lifted. Proceeding with the request.")
+                logger.info('Rate limit has been lifted. Proceeding with the request.')
                 return
             except (RateLimitError, InternalServerError) as e:
                 if isinstance(e, InternalServerError) and '429' not in str(e):
                     raise
-                logger.info("Still rate limited, waiting before next check...")
+                logger.info('Still rate limited, waiting before next check...')
                 time.sleep(retry_min_wait)
-            except Exception as e:
-                logger.warning(f"Error while polling rate limit status: {e}")
-                logger.info(f"Waiting {retry_min_wait} seconds before next attempt...")
+            except (ValueError, KeyError, AttributeError) as e:
+                # Handle common errors that might occur during the test request
+                logger.warning('Error while polling rate limit status: %s', e)
+                logger.info('Waiting %s seconds before next attempt...', retry_min_wait)
                 time.sleep(retry_min_wait)
-                        
-                    return
-                except RateLimitError:
-                    logger.info("Still rate limited, waiting before next check...")
-                    time.sleep(retry_min_wait)
-                    continue
-                except Exception as e:
-                    logger.warning(f"Error while polling rate limit status: {e}")
-                    logger.info(f"Waiting {retry_min_wait} seconds before next attempt...")
-                    time.sleep(retry_min_wait)
 
     def retry_decorator(self, **kwargs):
         """
-        Create a LLM retry decorator with customizable parameters. This is used for 429 errors, and a few other exceptions in LLM classes.
-        
+        Create a LLM retry decorator with customizable parameters.
+        This is used for 429 errors, and a few other exceptions in LLM classes.
+
         For rate limit errors (429), this implementation will:
         1. Check for a reset_time in the exception and wait until that time if available
-        2. If no reset_time is available, actively poll the API with minimal requests until the rate limit is lifted
+        2. If no reset_time is available, actively poll the API with minimal requests
+           until the rate limit is lifted
         3. Continue with the original request once the rate limit is over
 
         Args:
             **kwargs: Keyword arguments to override default retry behavior.
-                      Keys: num_retries, retry_exceptions, retry_min_wait, retry_max_wait, retry_multiplier
+                   Keys: num_retries, retry_exceptions, retry_min_wait, retry_max_wait,
+                   retry_multiplier
 
         Returns:
             A retry decorator with the parameters customizable in configuration.
@@ -108,7 +102,7 @@ class RetryMixin:
 
         def before_sleep(retry_state):
             exception = retry_state.outcome.exception()
-            
+
             # Handle rate limits differently
             if isinstance(exception, (RateLimitError, InternalServerError)):
                 # Check if this is a rate limit error
@@ -119,7 +113,7 @@ class RetryMixin:
                 else:  # RateLimitError
                     self.handle_rate_limit(exception, retry_min_wait)
                     return
-                
+
             # For other exceptions, use normal retry behavior
             self.log_retry_attempt(retry_state)
             if retry_listener:
@@ -143,5 +137,6 @@ class RetryMixin:
         """Log retry attempts."""
         exception = retry_state.outcome.exception()
         logger.error(
-            f'{exception}. Attempt #{retry_state.attempt_number} | You can customize retry values in the configuration.',
+            '%s. Attempt #%d | You can customize retry values in the configuration.',
+            exception, retry_state.attempt_number
         )
