@@ -255,7 +255,9 @@ class AgentController:
             is_rate_limit_error = (
                     isinstance(e, RateLimitError) or
                     (isinstance(e, litellm.InternalServerError) and
-                                ('rate limit exceeded' in str(e).lower() ))
+                                ('rate limit exceeded' in str(e).lower() )) or
+                    (isinstance(e, litellm.InternalServerError) and
+                                ('try refreshing and contact us if the problem persists' in str(e).lower() ))
                 )
 
             if is_rate_limit_error:
