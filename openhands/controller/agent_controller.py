@@ -259,7 +259,7 @@ class AgentController:
                 )
 
             if is_rate_limit_error:
-                e = RateLimitError('Anthropic', 'Claude-3.5-Sonnet')
+                e = RateLimitError(str(e), 'Anthropic', 'Claude-3.5-Sonnet')
 
             if (
                 isinstance(e, litellm.AuthenticationError)
