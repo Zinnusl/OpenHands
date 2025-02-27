@@ -261,8 +261,17 @@ class AgentController:
                 )
 
             if is_rate_limit_error:
-                e = RateLimitError(str(e), 'Anthropic', 'Claude-3.5-Sonnet')
+                e = RateLimitError('rate limited', 'Anthropic', 'Claude-3.5-Sonnet')
 
+            is_context_window_error = (
+                    isinstance(e, litellm.InternalServerError) and
+                    'exceeds the limit of' in str(e).lower()
+                )
+
+            if is_context_window_error:
+                e = LLMContextWindowExceedError('Conversation history longer than')
+
+                                  
             if (
                 isinstance(e, litellm.AuthenticationError)
                 or isinstance(e, litellm.BadRequestError)
