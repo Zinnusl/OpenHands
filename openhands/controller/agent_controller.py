@@ -255,11 +255,11 @@ class AgentController:
             is_rate_limit_error = (
                     isinstance(e, RateLimitError) or
                     (isinstance(e, litellm.InternalServerError) and
-                                ('rate limit' in str(e).lower() or '429' in str(e)))
+                                ('rate limit exceeded' in str(e).lower() ))
                 )
 
             if is_rate_limit_error:
-                e = RateLimitError('429: Rate limit error')
+                e = RateLimitError('Anthropic', 'Claude-3.5-Sonnet')
 
             if (
                 isinstance(e, litellm.AuthenticationError)
