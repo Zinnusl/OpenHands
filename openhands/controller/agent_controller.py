@@ -251,6 +251,16 @@ class AgentController:
                 f'report this error to the developers. Your session ID is {self.id}. '
                 f'Error type: {e.__class__.__name__}'
             )
+
+            is_rate_limit_error = (
+                    isinstance(e, RateLimitError) or
+                    (isinstance(e, litellm.InternalServerError) and
+                                ('rate limit' in str(e).lower() or '429' in str(e)))
+                )
+
+            if is_rate_limit_error:
+                e = RateLimitError('429: Rate limit error')
+
             if (
                 isinstance(e, litellm.AuthenticationError)
                 or isinstance(e, litellm.BadRequestError)
