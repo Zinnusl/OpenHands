@@ -241,11 +241,6 @@ class AgentController:
         try:
             await self._step()
         except Exception as e:
-            self.log(
-                'error',
-                f'Error while running the agent (session ID: {self.id}): {e}. '
-                f'Traceback: {traceback.format_exc()}',
-            )
             reported = RuntimeError(
                 'There was an unexpected error while running the agent. Please '
                 f'report this error to the developers. Your session ID is {self.id}. '
@@ -271,7 +266,6 @@ class AgentController:
             if is_context_window_error:
                 e = LLMContextWindowExceedError('Conversation history longer than')
 
-                                  
             if (
                 isinstance(e, litellm.AuthenticationError)
                 or isinstance(e, litellm.BadRequestError)
@@ -279,6 +273,14 @@ class AgentController:
                 or isinstance(e, LLMContextWindowExceedError)
             ):
                 reported = e
+                self.log('info', f'Handleld error: {e.__class__.__name__}')
+            else:
+                self.log(
+                    'error',
+                    f'Error while running the agent (session ID: {self.id}): {e}. '
+                    f'Traceback: {traceback.format_exc()}',
+                )
+
             await self._react_to_exception(reported)
 
     def should_step(self, event: Event) -> bool:
