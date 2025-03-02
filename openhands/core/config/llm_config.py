@@ -61,9 +61,9 @@ class LLMConfig(BaseModel):
     openrouter_site_url: str = Field(default='https://docs.all-hands.dev/')
     openrouter_app_name: str = Field(default='OpenHands')
     # total wait time: 5 + 10 + 20 + 30 = 65 seconds
-    num_retries: int = Field(default=10)
-    retry_multiplier: float = Field(default=6)
-    retry_min_wait: int = Field(default=300)
+    num_retries: int = Field(default=30)
+    retry_multiplier: float = Field(default=2)
+    retry_min_wait: int = Field(default=60)
     retry_max_wait: int = Field(default=43200)
     timeout: int | None = Field(default=None)
     max_message_chars: int = Field(
