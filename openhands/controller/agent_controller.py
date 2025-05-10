@@ -227,6 +227,8 @@ class AgentController:
                 err_id = 'STATUS$ERROR_LLM_SERVICE_UNAVAILABLE'
             elif isinstance(e, litellm.InternalServerError):
                 err_id = 'STATUS$ERROR_LLM_INTERNAL_SERVER_ERROR'
+            elif isinstance(e, litellm.BadRequestError) and 'ExceededBudget' in str(e):
+                err_id = 'STATUS$ERROR_LLM_OUT_OF_CREDITS'
             elif isinstance(e, RateLimitError):
                 await self.set_agent_state_to(AgentState.RATE_LIMITED)
                 return
@@ -239,16 +241,31 @@ class AgentController:
         try:
             await self._step()
         except Exception as e:
-            self.log(
-                'error',
-                f'Error while running the agent (session ID: {self.id}): {e}. '
-                f'Traceback: {traceback.format_exc()}',
-            )
             reported = RuntimeError(
                 'There was an unexpected error while running the agent. Please '
                 f'report this error to the developers. Your session ID is {self.id}. '
                 f'Error type: {e.__class__.__name__}'
             )
+
+            is_rate_limit_error = (
+                    isinstance(e, RateLimitError) or
+                    (isinstance(e, litellm.InternalServerError) and
+                                ('rate limit exceeded' in str(e).lower() )) or
+                    (isinstance(e, litellm.InternalServerError) and
+                                ('try refreshing and contact us if the problem persists' in str(e).lower() ))
+                )
+
+            if is_rate_limit_error:
+                e = RateLimitError('rate limited', 'Anthropic', 'Claude-3.5-Sonnet')
+
+            is_context_window_error = (
+                    isinstance(e, litellm.InternalServerError) and
+                    'exceeds the limit of' in str(e).lower()
+                )
+
+            if is_context_window_error:
+                e = LLMContextWindowExceedError('Conversation history longer than')
+
             if (
                 isinstance(e, litellm.AuthenticationError)
                 or isinstance(e, litellm.BadRequestError)
@@ -256,6 +273,14 @@ class AgentController:
                 or isinstance(e, LLMContextWindowExceedError)
             ):
                 reported = e
+                self.log('info', f'Handleld error: {e.__class__.__name__}')
+            else:
+                self.log(
+                    'error',
+                    f'Error while running the agent (session ID: {self.id}): {e}. '
+                    f'Traceback: {traceback.format_exc()}',
+                )
+
             await self._react_to_exception(reported)
 
     def should_step(self, event: Event) -> bool:
